@@ -57,5 +57,21 @@ handler_t *Signal(int signum, handler_t *handler)
 /*  Add the missing wrappers for: fork, exec, sigprocmask, sigemptyset,
  *  sigfillset, and kill
  */
+pid_t Fork(void) {
+    pid_t pid;
 
+    if ((pid == fork()) < 0) {
+        unix_error("Fork error");
+    }
+    return pid;
+}
+
+//Execute a program
+//Doesn't return unless there is an error
+void Exec(char *file, char **argv[], char **environ) {
+    if (execve(file, argv. environ) < 0) {
+        printf("%s: Command not found.\n", file);
+        return;
+    }
+}
 

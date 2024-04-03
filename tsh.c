@@ -137,6 +137,36 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+    char *argv[MAXARGS];
+    char buf[MAXLINE];
+
+    int bg;
+    pid_t pid;
+      
+    strcpy(buf, cmdline);
+    bg = parseline(buf, argv);
+
+    if (argv[0] == NULL) {
+        return;
+    }
+
+
+
+    if (!builtin_cmd(argv)) {
+        if ((pid = Fork()) == 0) {
+            Exec(argv[0], argv, environ);
+        }
+
+        if (!bg) {
+            int status;
+            if (waitpid(pid, &status, 0) < 0) {
+                unix_error("waitfg: waitpid error");
+            }
+        }
+        else {
+            printf("%d %s", pid, cmdline);
+        }   
+    }
     return;
 }
 
@@ -146,6 +176,12 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
+   if (!strncmp(argv[0], "quit", 4)) {
+      exit(0);
+   }
+   /*
+    * runs builtins, and return 1
+    */
     return 0;     /* not a builtin command */
 }
 
@@ -178,7 +214,9 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    return;
+    int olderrno = errno;
+    pid = waitpid(-1, NULL, 0);
+    errno = olderrno;
 }
 
 /* 
