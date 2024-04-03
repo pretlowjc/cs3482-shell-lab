@@ -178,12 +178,14 @@ void eval(char *cmdline)
             Sigprocmask(SIG_BLOCK, &mask_all, NULL);
             addjob(jobs, pid, FG, cmdline);
             Sigprocmask(SIG_SETMASK, &prev_one, NULL); 
-            if (waitpid(pid, &status, 0) < 0) {
-                unix_error("waitfg: waitpid error");
-            }
+            waitfg(pid);
         }
         else {
             printf("%d %s", pid, cmdline);
+            Sigprocmask(SIG_BLOCK, &mask_all, NULL);
+            addjob(jobs, pid, BG, cmdline);
+            Sigprocmask(SIG_SETMASK, &prev_one, NULL); 
+            // do background process
         }   
     }
     return;
