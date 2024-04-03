@@ -181,10 +181,11 @@ void eval(char *cmdline)
             waitfg(pid);
         }
         else {
-            printf("%d %s", pid, cmdline);
             Sigprocmask(SIG_BLOCK, &mask_all, NULL);
             addjob(jobs, pid, BG, cmdline);
+            int jid = pid2jid(pid);
             Sigprocmask(SIG_SETMASK, &prev_one, NULL); 
+            printf("[%d] (%d) %s", jid, pid, cmdline);
             // do background process
         }   
     }
@@ -197,9 +198,15 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
-   if (!strncmp(argv[0], "quit", 4)) {
-      exit(0);
-   }
+    if (!strncmp(argv[0], "quit", 4)) {
+        exit(0);
+    }
+
+    if (!strncmp(argv[0], "jobs", 4)) {
+        listjobs(jobs);
+        return(1);
+    }
+
    /*
     * runs builtins, and return 1
     */
@@ -244,11 +251,12 @@ void sigchld_handler(int sig)
     Sigfillset(&mask_all);
 
 
-    pid = waitpid(-1, &status, 0);
+    while ((pid = waitpid(-1, &status, (WNOHANG | WUNTRACED))) > 0) {
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        deletejob(jobs, pid);
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+    }
 
-    Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
-    deletejob(jobs, pid);
-    Sigprocmask(SIG_SETMASK, &prev_all, NULL);
 }
 
 /* 
