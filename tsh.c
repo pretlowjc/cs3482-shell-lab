@@ -139,6 +139,10 @@ void eval(char *cmdline)
 {
     char *argv[MAXARGS];
     char buf[MAXLINE];
+    
+    int status, i;
+    sigset_t mask_all, prev_all, mask_one, prev_one;
+    Sigfillset(&mask_all);
 
     int bg;
     pid_t pid;
@@ -153,12 +157,27 @@ void eval(char *cmdline)
 
 
     if (!builtin_cmd(argv)) {
+        // Parent process blocks SIGCHLD
+        Sigemptyset(&mask_one);
+        Sigaddset(&mask_one, SIGCHLD);
+        Sigprocmask(SIG_BLOCK, &mask_one, &prev_one);
+        
+        // Spawn a child process
+        // This is also the child process logic.
         if ((pid = Fork()) == 0) {
+            // Child process restores all signals (for itself).
+            Sigprocmask(SIG_SETMASK, &prev_one, NULL);
             Exec(argv[0], argv, environ);
         }
+        
+        // Parent progress
+        // Block all signals, add child to job list, restore all signals (including SIGCHLD).
 
         if (!bg) {
             int status;
+            Sigprocmask(SIG_BLOCK, &mask_all, NULL);
+            addjob(jobs, pid, FG, cmdline);
+            Sigprocmask(SIG_SETMASK, &prev_one, NULL); 
             if (waitpid(pid, &status, 0) < 0) {
                 unix_error("waitfg: waitpid error");
             }
@@ -198,6 +217,9 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
+    while (pid == fgpid(jobs)) {
+        sleep(1);
+    }
     return;
 }
 
@@ -214,9 +236,17 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    int olderrno = errno;
-    pid = waitpid(-1, NULL, 0);
-    errno = olderrno;
+    int status, i;
+    pid_t pid;
+    sigset_t mask_all, prev_all;
+    Sigfillset(&mask_all);
+
+
+    pid = waitpid(-1, &status, 0);
+
+    Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+    deletejob(jobs, pid);
+    Sigprocmask(SIG_SETMASK, &prev_all, NULL);
 }
 
 /* 

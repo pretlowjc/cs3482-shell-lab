@@ -60,18 +60,50 @@ handler_t *Signal(int signum, handler_t *handler)
 pid_t Fork(void) {
     pid_t pid;
 
-    if ((pid == fork()) < 0) {
+    if ((pid = fork()) < 0) {
         unix_error("Fork error");
     }
+    
     return pid;
 }
 
 //Execute a program
 //Doesn't return unless there is an error
-void Exec(char *file, char **argv[], char **environ) {
-    if (execve(file, argv. environ) < 0) {
+void Exec(char *file, char **argv, char **environ) {
+    if (execve(file, argv, environ) < 0) {
         printf("%s: Command not found.\n", file);
         return;
     }
 }
 
+int Sigprocmask(int option, sigset_t *newmask, sigset_t *prevmask) {
+    if (sigprocmask(option, newmask, prevmask) < 0) {
+        unix_error("sigprocmask error");
+    }
+    return 0;
+}
+
+int Sigemptyset(sigset_t *mask) {
+    if (sigemptyset(mask) < 0) {
+        unix_error("sigemptyset error");
+    }
+    return 0;
+}
+
+int Sigaddset(sigset_t *mask, int option) {
+    if (sigaddset(mask, option) < 0) {
+        unix_error("sigaddset error");
+    }
+    return 0;
+}
+
+int Sigfillset(sigset_t *mask) {
+    if (sigfillset(mask) < 0) {
+        unix_error("sigfillset error");
+    }
+    return 0;
+}
+
+int Kill(pid_t pid, int signal) {
+    return 0;
+}
