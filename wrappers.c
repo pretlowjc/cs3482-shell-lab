@@ -105,5 +105,8 @@ int Sigfillset(sigset_t *mask) {
 }
 
 int Kill(pid_t pid, int signal) {
+    if (kill(pid, signal) < 0) {
+        unix_error("kill error");
+    }
     return 0;
 }

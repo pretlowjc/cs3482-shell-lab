@@ -167,6 +167,7 @@ void eval(char *cmdline)
         if ((pid = Fork()) == 0) {
             // Child process restores all signals (for itself).
             Sigprocmask(SIG_SETMASK, &prev_one, NULL);
+            setpgid(0,0);
             Exec(argv[0], argv, environ);
         }
         
@@ -252,9 +253,18 @@ void sigchld_handler(int sig)
 
 
     while ((pid = waitpid(-1, &status, (WNOHANG | WUNTRACED))) > 0) {
-        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
-        deletejob(jobs, pid);
-        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+        if (WIFEXITED(status)) {
+            Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+            deletejob(jobs, pid);
+            Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+        }
+        if (WIFSIGNALED(status)) {
+            int jid = pid2jid(pid);
+            printf("Job [%d] (%d) terminated by signal %d\n", jid, pid, WTERMSIG(status));
+            Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+            deletejob(jobs, pid);
+            Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+        }
     }
 
 }
@@ -266,6 +276,11 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+    pid_t pid = fgpid(jobs);
+    if (pid == 0) {
+        return;
+    }
+    Kill(pid, SIGINT);
     return;
 }
 
