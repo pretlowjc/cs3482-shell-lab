@@ -213,7 +213,11 @@ int builtin_cmd(char **argv)
         listjobs(jobs);
         return (1);
     }
-
+    if (!strncmp(argv[0], "bg", 2))
+    {
+        do_bgfg(argv);
+        return (1);
+    }
     /*
      * runs builtins, and return 1
      */
@@ -221,10 +225,60 @@ int builtin_cmd(char **argv)
 }
 
 /*
- * do_bgfg - Execute the builtin bg and fg commands
- */
+    do_bgfg - Execute the builtin bg and fg commands
+
+    Add code to grab either the job id or the pid depending upon whether
+    the parameter starts with a % or not.
+
+    If the parameter is a job id, then uses the getjobjid function to get the pid.
+
+    If argv[0] is "bg" then use the kill command to send the SIGCONT signal to every
+    process in the job. Also, set the state of the job to BG.
+
+    (Note: sending a SIGCONT signal to a child process will cause a SIGCHLD signal
+    to be sent to the parent process (the shell) just like SIGINT and SIGTSTP, but
+    we're not going to do anything with those particular SIGCHLD signals in order
+    to keep the code simpler.)
+
+    Finally, print the the job number in [ ], the pid number in (), and the original
+    command line.  (See on ASULearn page.)
+
+    The original command line is available in the jobs array.  Before you modify the
+    job state, block all signals and restore them afterward, for reasons mentioned earlier.
+*/
 void do_bgfg(char **argv)
 {
+    pid_t pid;
+    int jid;
+    sigset_t mask_all, prev_all;
+    Sigfillset(&mask_all);
+
+    // if the parameter to bg starts with a % then the number is the jid.
+    if (!strncmp(argv[0], "bg %", 4))
+    {
+        // use the getjobjid function to get the pid.
+        pid = getjobjid(jobs, jid);
+    }
+    // case of when the number does not start with a % and is interpreted to be a pid.
+    else
+    {
+        // use the kill command to send the SIGCONT signal to every process in the job.
+        Kill(pid, SIGCONT);
+
+        // before you modify the job state, block all signals and restore them afterward.
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        deletejob(jobs, pid);
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+
+        // set the state of the job to BG.
+        job_t *changedState = getjobjpid(jobs, pid);
+        changedState->state = BG;
+    }
+    // print the job number in [], the pid number in (), and the original command line.
+    // the original command line is available in the jobs array.
+    // unsure about the cmdline part for the print statement!
+    // printf("[%d] (%d)  %d\n", jid, pid, ____);
+
     return;
 }
 
