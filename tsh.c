@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include "jobs.h"     //prototypes for functions that manage the jobs list
 #include "wrappers.h" //prototypes for functions in wrappers.c
+//#include <string>
+
 
 /* Misc manifest constants */
 #define MAXLINE 1024 /* max line size */
@@ -218,6 +220,11 @@ int builtin_cmd(char **argv)
         do_bgfg(argv);
         return (1);
     }
+    if (!strncmp(argv[0], "fg", 2))
+    {
+        do_bgfg(argv);
+        return (1);
+    }
     /*
      * runs builtins, and return 1
      */
@@ -252,34 +259,71 @@ void do_bgfg(char **argv)
     int jid;
     sigset_t mask_all, prev_all;
     Sigfillset(&mask_all);
-
-    // if the parameter to bg starts with a % then the number is the jid.
-    if (!strncmp(argv[0], "bg %", 4))
+    job_t * job;
+    
+    // Get whether the second parameter is a jid or a pid;
+    // Retrieve and store that value.
+    if (!strncmp(argv[1], "%", 1))
     {
-        // use the getjobjid function to get the pid.
-        pid = getjobjid(jobs, jid);
-    }
-    // case of when the number does not start with a % and is interpreted to be a pid.
+        //use the getjobjid function to get the pid.
+        argv[1]++;
+        jid = atoi(argv[1]);
+        job = getjobjid(jobs, jid);
+        pid = job->pid;
+    } 
     else
     {
         // use the kill command to send the SIGCONT signal to every process in the job.
+        pid = (pid_t) atoi(argv[1]);
+        jid = pid2jid(pid);
+        job = getjobpid(jobs, pid);
+    }
+    
+    
+    // Check whether we ran bg or fg
+    if (!strncmp(argv[0], "bg", 2)) {
+        
+        // If the second argument (parameters to bg) begin with '%'...
+        
         Kill(pid, SIGCONT);
-
+        
+        /*
         // before you modify the job state, block all signals and restore them afterward.
-        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
         deletejob(jobs, pid);
-        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+        */
 
         // set the state of the job to BG.
-        job_t *changedState = getjobjpid(jobs, pid);
-        changedState->state = BG;
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        job->state = BG;
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+        
+        // print the job number in [], the pid number in (), and the original command line.
+        // the original command line is available in the jobs array.
+        // unsure about the cmdline part for the print statement!
+        
+        printf("[%d] (%d)  %s", jid, pid, job->cmdline);
     }
-    // print the job number in [], the pid number in (), and the original command line.
-    // the original command line is available in the jobs array.
-    // unsure about the cmdline part for the print statement!
-    // printf("[%d] (%d)  %d\n", jid, pid, ____);
+    
+    // If fg...
+    if (!strncmp(argv[0], "fg", 2)) {
+        // If job is stopped, continue and set to FG.
+        // If job state is BG, set to FG.
+        if (job->state == ST) {
+            Kill(pid, SIGCONT);
+            Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+            job->state = FG;
+            Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+        }
+        if (job->state == BG) {
+            Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+            job->state = FG;
+            Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+        }
 
-    return;
+        waitfg(pid);
+    }
+
+   return;
 }
 
 /*
@@ -346,13 +390,13 @@ void sigchld_handler(int sig)
             {
                 job_t *changedState = getjobjid(jobs, jid);
                 changedState->state = ST;
-            }
+            }/*
             else
             {
                 Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
                 deletejob(jobs, pid);
                 Sigprocmask(SIG_SETMASK, &prev_all, NULL);
-            }
+            }*/
         }
     }
 }
