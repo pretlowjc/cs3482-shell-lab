@@ -260,32 +260,63 @@ void do_bgfg(char **argv)
     sigset_t mask_all, prev_all;
     Sigfillset(&mask_all);
     job_t * job;
+    char * p;
+
+    // If no parameter...
+    if (argv[1] == NULL) {
+        printf("%s command requires PID or %%jobid argument\n", argv[0]); 
+        return;
+    }
     
+    
+
     // Get whether the second parameter is a jid or a pid;
     // Retrieve and store that value.
     if (!strncmp(argv[1], "%", 1))
     {
         //use the getjobjid function to get the pid.
-        argv[1]++;
-        jid = atoi(argv[1]);
+        jid = strtol((argv[1] + 1), &p, 10);
         job = getjobjid(jobs, jid);
+        // Make sure numerical conversion worked fine.
+        if (p == argv[1]) {
+            printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+            return;
+        }
+
+        // Make sure the job exists.
+        if (job == NULL) {
+            printf("%s: No such job\n", argv[1]);
+            return;
+        }
         pid = job->pid;
     } 
     else
     {
         // use the kill command to send the SIGCONT signal to every process in the job.
-        pid = (pid_t) atoi(argv[1]);
+        pid = (pid_t) strtol(argv[1], &p, 10);
         jid = pid2jid(pid);
         job = getjobpid(jobs, pid);
+        // Make sure numerical conversion worked fine,
+        if (p == argv[1]) {
+            printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+            return;
+        }
+
+        // Make sure the process exists.
+        if (job == NULL) {
+            printf("(%s): No such process\n", argv[1]);
+            return;
+        }
     }
     
-    
+
+
     // Check whether we ran bg or fg
     if (!strncmp(argv[0], "bg", 2)) {
         
         // If the second argument (parameters to bg) begin with '%'...
         
-        Kill(pid, SIGCONT);
+        Kill(-pid, SIGCONT);
         
         /*
         // before you modify the job state, block all signals and restore them afterward.
@@ -306,10 +337,11 @@ void do_bgfg(char **argv)
     
     // If fg...
     if (!strncmp(argv[0], "fg", 2)) {
+        
         // If job is stopped, continue and set to FG.
         // If job state is BG, set to FG.
         if (job->state == ST) {
-            Kill(pid, SIGCONT);
+            Kill(-pid, SIGCONT);
             Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
             job->state = FG;
             Sigprocmask(SIG_SETMASK, &prev_all, NULL);
@@ -390,13 +422,13 @@ void sigchld_handler(int sig)
             {
                 job_t *changedState = getjobjid(jobs, jid);
                 changedState->state = ST;
-            }/*
+            }
             else
             {
                 Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
                 deletejob(jobs, pid);
                 Sigprocmask(SIG_SETMASK, &prev_all, NULL);
-            }*/
+            }
         }
     }
 }
@@ -413,7 +445,7 @@ void sigint_handler(int sig)
     {
         return;
     }
-    Kill(pid, SIGINT);
+    Kill(-pid, SIGINT);
     return;
 }
 

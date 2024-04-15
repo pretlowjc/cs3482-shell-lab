@@ -71,7 +71,7 @@ pid_t Fork(void) {
 //Doesn't return unless there is an error
 void Exec(char *file, char **argv, char **environ) {
     if (execve(file, argv, environ) < 0) {
-        printf("%s: Command not found.\n", file);
+        printf("%s: Command not found\n", file);
         exit(0);
     }
 }
